@@ -8,47 +8,30 @@ use DTApi\Models\Distance;
 use Illuminate\Http\Request;
 use DTApi\Repository\BookingRepository;
 
-/**
- * Class BookingController
- * @package DTApi\Http\Controllers
- */
 class BookingController extends Controller
 {
-
-    /**
-     * @var BookingRepository
-     */
     protected $repository;
 
-    /**
-     * BookingController constructor.
-     * @param BookingRepository $bookingRepository
-     */
     public function __construct(BookingRepository $bookingRepository)
     {
         $this->repository = $bookingRepository;
     }
 
-    /**
-     * @param Request $request
-     * @return mixed
-     */
     public function index(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
+        $user = $request->__authenticatedUser;
 
-            $response = $this->repository->getUsersJobs($user_id);
-
-        }
-        elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
-        {
+        if ($user->user_type == env('ADMIN_ROLE_ID') || $user->user_type == env('SUPERADMIN_ROLE_ID')) {
             $response = $this->repository->getAll($request);
+        } else {
+            $user_id = $request->get('user_id');
+            $response = $user_id ? $this->repository->getUsersJobs($user_id) : null;
         }
 
         return response($response);
     }
 
-    /**
+  /**
      * @param $id
      * @return mixed
      */
@@ -192,77 +175,26 @@ class BookingController extends Controller
         return response($response);
     }
 
-    public function distanceFeed(Request $request)
+    private function updateDistanceAndTime($data)
     {
-        $data = $request->all();
+        $distance = isset($data['distance']) ? $data['distance'] : '';
+        $time = isset($data['time']) ? $data['time'] : '';
 
-        if (isset($data['distance']) && $data['distance'] != "") {
-            $distance = $data['distance'];
-        } else {
-            $distance = "";
-        }
-        if (isset($data['time']) && $data['time'] != "") {
-            $time = $data['time'];
-        } else {
-            $time = "";
-        }
-        if (isset($data['jobid']) && $data['jobid'] != "") {
-            $jobid = $data['jobid'];
-        }
-
-        if (isset($data['session_time']) && $data['session_time'] != "") {
-            $session = $data['session_time'];
-        } else {
-            $session = "";
-        }
-
-        if ($data['flagged'] == 'true') {
-            if($data['admincomment'] == '') return "Please, add comment";
-            $flagged = 'yes';
-        } else {
-            $flagged = 'no';
-        }
-        
-        if ($data['manually_handled'] == 'true') {
-            $manually_handled = 'yes';
-        } else {
-            $manually_handled = 'no';
-        }
-
-        if ($data['by_admin'] == 'true') {
-            $by_admin = 'yes';
-        } else {
-            $by_admin = 'no';
-        }
-
-        if (isset($data['admincomment']) && $data['admincomment'] != "") {
-            $admincomment = $data['admincomment'];
-        } else {
-            $admincomment = "";
-        }
-        if ($time || $distance) {
-
-            $affectedRows = Distance::where('job_id', '=', $jobid)->update(array('distance' => $distance, 'time' => $time));
-        }
-
-        if ($admincomment || $session || $flagged || $manually_handled || $by_admin) {
-
-            $affectedRows1 = Job::where('id', '=', $jobid)->update(array('admin_comments' => $admincomment, 'flagged' => $flagged, 'session_time' => $session, 'manually_handled' => $manually_handled, 'by_admin' => $by_admin));
-
-        }
-
-        return response('Record updated!');
+        return compact('distance', 'time');
     }
 
-    public function reopen(Request $request)
+    private function updateJobData($data)
     {
-        $data = $request->all();
-        $response = $this->repository->reopen($data);
+        $jobid = $data['jobid'];
+        $session = $data['session_time'] ?? '';
+        $flagged = $data['flagged'] === 'true' ? 'yes' : 'no';
+        $manuallyHandled = $data['manually_handled'] === 'true' ? 'yes' : 'no';
+        $byAdmin = $data['by_admin'] === 'true' ? 'yes' : 'no';
+        $adminComment = $data['admincomment'] ?? '';
 
-        return response($response);
+        return compact('jobid', 'session', 'flagged', 'manuallyHandled', 'byAdmin', 'adminComment');
     }
-
-    public function resendNotifications(Request $request)
+     public function resendNotifications(Request $request)
     {
         $data = $request->all();
         $job = $this->repository->find($data['jobid']);
@@ -292,3 +224,8 @@ class BookingController extends Controller
     }
 
 }
+
+
+
+
+ 
